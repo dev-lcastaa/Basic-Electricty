@@ -34,7 +34,7 @@ public class ModCreativeModTabs {
 //                        output.accept(ModBlocks.ELECTRIC_BLAST_FURNACE.get());
 //                        output.accept(ModBlocks.ELECTRIC_SMOKER.get());
 //                        output.accept(ModBlocks.ELECTRIC_BREWERY.get());
-//                        output.accept(ModBlocks.COAL_GENERATOR.get());
+                        output.accept(ModBlocks.COAL_GENERATOR.get());
 //                        output.accept(ModBlocks.SILICON_ORE.get());
 //                        output.accept(ModBlocks.BLACK_SAND.get());
 //                        output.accept(ModBlocks.SOLAR_PANEL.get());

@@ -1,5 +1,7 @@
 package xyz.aqlabs.basicelectricity.energy;
 
+import net.minecraft.nbt.CompoundTag;
+
 public class EnergyStorage implements IEnergyStorage{
 
     private int energy;
@@ -47,4 +49,16 @@ public class EnergyStorage implements IEnergyStorage{
     public boolean canExtract() {
         return energy > 0;
     }
+    // NBT Serialization to save energy state
+    public CompoundTag serializeNBT() {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("Energy", energy);
+        return tag;
+    }
+
+    // NBT Deserialization to load energy state
+    public void deserializeNBT(CompoundTag tag) {
+        this.energy = tag.getInt("Energy");
+    }
+
 }

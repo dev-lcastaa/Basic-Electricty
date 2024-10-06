@@ -1,6 +1,7 @@
 package xyz.aqlabs.basicelectricity;
 
 import com.mojang.logging.LogUtils;
+import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
@@ -12,9 +13,12 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
+import xyz.aqlabs.basicelectricity.block.ModBlockEntities;
 import xyz.aqlabs.basicelectricity.block.ModBlocks;
 import xyz.aqlabs.basicelectricity.item.ModCreativeModTabs;
 import xyz.aqlabs.basicelectricity.item.ModItems;
+import xyz.aqlabs.basicelectricity.screen.ElectricFurnaceScreen;
+import xyz.aqlabs.basicelectricity.screen.ModMenuTypes;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(BasicElectricity.MOD_ID)
@@ -34,6 +38,12 @@ public class BasicElectricity {
 
         // Register modded blocks
         ModBlocks.register(modEventBus);
+
+        // Register block entities
+        ModBlockEntities.register(modEventBus);
+
+        // Register Mod Menus
+        ModMenuTypes.register(modEventBus);
 
         // Register modded tabs
         ModCreativeModTabs.register(modEventBus);
@@ -68,7 +78,9 @@ public class BasicElectricity {
     public static class ClientModEvents {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-
+            event.enqueueWork(() -> {
+                MenuScreens.register(ModMenuTypes.ELECTRIC_FURNACE_MENU.get(), ElectricFurnaceScreen::new);
+            });
         }
     }
 }

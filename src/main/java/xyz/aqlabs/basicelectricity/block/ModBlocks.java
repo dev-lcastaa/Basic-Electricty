@@ -10,6 +10,7 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import xyz.aqlabs.basicelectricity.BasicElectricity;
+import xyz.aqlabs.basicelectricity.block.custom.CoalGeneratorBlock;
 import xyz.aqlabs.basicelectricity.block.custom.ElectricFurnaceBlock;
 import xyz.aqlabs.basicelectricity.item.ModItems;
 
@@ -32,8 +33,8 @@ public class ModBlocks {
 //    public static final RegistryObject<Block> ELECTRIC_BREWERY = registerBlock("electric_brewery",
 //            () -> new Block(BlockBehaviour.Properties.copy(Blocks.BLAST_FURNACE)));
 //
-//    public static final RegistryObject<Block> COAL_GENERATOR = registerBlock("coal_generator",
-//            () -> new Block(BlockBehaviour.Properties.copy(Blocks.BLAST_FURNACE)));
+    public static final RegistryObject<Block> COAL_GENERATOR = registerBlock("coal_generator",
+            () -> new CoalGeneratorBlock());
 //
 //    public static final RegistryObject<Block> SILICON_ORE = registerBlock("silicon_ore",
 //            () -> new Block(BlockBehaviour.Properties.copy(Blocks.GOLD_ORE)));
