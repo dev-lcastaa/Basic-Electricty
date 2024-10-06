@@ -3,111 +3,168 @@ package xyz.aqlabs.basicelectricity.block.entity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.Containers;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import xyz.aqlabs.basicelectricity.block.ModBlockEntities;
 import xyz.aqlabs.basicelectricity.energy.EnergyStorage;
+import xyz.aqlabs.basicelectricity.screen.CoalGeneratorMenu;
+import xyz.aqlabs.basicelectricity.screen.ElectricFurnaceMenu;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-public class CoalGeneratorBlockEntity extends BlockEntity {
+public class CoalGeneratorBlockEntity extends BlockEntity implements MenuProvider {
 
 
-    private static final int ENERGY_PER_TICK = 20; // Amount of energy generated per tick
-
-    // Inventory to hold the fuel (1 slot)
-    private final ItemStackHandler fuelHandler = new ItemStackHandler(1);
-
-    // Energy storage for the generator
-    private final EnergyStorage energyStorage = new EnergyStorage(10000); // Example capacity
-
-    // Cache LazyOptionals for capability handling
-    private final LazyOptional<ItemStackHandler> fuelHandlerOptional = LazyOptional.of(() -> fuelHandler);
-    private final LazyOptional<EnergyStorage> energyOptional = LazyOptional.of(() -> energyStorage);
-
-    // Burn time management
-    private int burnTime = 0;          // Remaining ticks the current fuel will last
-    private int totalBurnTime = 0;     // Total burn time of the current fuel
-
-    public CoalGeneratorBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlockEntities.COAL_GENERATOR.get(), pos, state);
-    }
-
-    public void tick() {
-        boolean isBurning = burnTime > 0;
-
-        if (isBurning) {
-            // Decrease burn time and generate energy
-            burnTime--;
-            energyStorage.receiveEnergy(ENERGY_PER_TICK, false); // Generate energy while burning
+    private final ItemStackHandler itemStackHandler = new ItemStackHandler(1) {
+        @Override
+        protected void onContentsChanged(int slot) {
+            setChanged();
         }
 
-        // If we aren't burning, try to consume fuel
-        if (!isBurning && !fuelHandler.getStackInSlot(0).isEmpty()) {
-            ItemStack fuelStack = fuelHandler.getStackInSlot(0);
-            totalBurnTime = burnTime = getBurnTime(fuelStack);
+        @Override
+        public boolean isItemValid(int slot, @NotNull ItemStack stack){
+            return switch (slot) {
+                case 0 -> stack.getItem() == Items.RAW_IRON;
+                case 1 -> false;
+                default -> super.isItemValid(slot,stack);
+            };
+        }
+    };
 
-            if (burnTime > 0) {
-                fuelHandler.extractItem(0, 1, false); // Consume 1 item of fuel
+    private static final int INPUT_SLOT = 0;
+
+    private LazyOptional<IItemHandler> lazyItemHandler = LazyOptional.empty();
+
+    protected final ContainerData data;
+    private int progress = 0;
+    private int maxProgress = 100;
+
+
+    public CoalGeneratorBlockEntity(BlockPos pPos, BlockState pBlockState) {
+        super(ModBlockEntities.COAL_GENERATOR.get(),pPos, pBlockState);
+        this.data = new ContainerData() {
+            @Override
+            public int get(int i) {
+                return switch (i) {
+                    case 0 -> CoalGeneratorBlockEntity.this.progress;
+                    case 1 -> CoalGeneratorBlockEntity.this.maxProgress;
+                    default -> 0;
+                };
             }
-        }
 
-        // Mark block entity as changed to sync with the client (e.g., for animation)
-        setChanged();
+            @Override
+            public void set(int i, int i1) {
+                switch (i) {
+                    case 0 -> CoalGeneratorBlockEntity.this.progress = i1;
+                    case 1 -> CoalGeneratorBlockEntity.this.maxProgress = i1;
+                };
+            }
+
+            @Override
+            public int getCount() {
+                return 2;
+            }
+        };
     }
 
-    // Get the burn time for a given fuel item
-    private int getBurnTime(ItemStack fuel) {
-        Item item = fuel.getItem();
-        return net.minecraftforge.common.ForgeHooks.getBurnTime(fuel, RecipeType.SMELTING);
-    }
 
-    // NBT (Data Persistence)
+
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
-        fuelHandler.deserializeNBT(tag.getCompound("FuelInventory"));
-        energyStorage.deserializeNBT(tag.getCompound("Energy"));
-        burnTime = tag.getInt("BurnTime");
-        totalBurnTime = tag.getInt("TotalBurnTime");
+    public Component getDisplayName() {
+        return Component.literal("Coal Generator");
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
-        tag.put("FuelInventory", fuelHandler.serializeNBT());
-        tag.put("Energy", energyStorage.serializeNBT());
-        tag.putInt("BurnTime", burnTime);
-        tag.putInt("TotalBurnTime", totalBurnTime);
+    public @Nullable AbstractContainerMenu createMenu(int i, Inventory inventory, Player player) {
+        return new CoalGeneratorMenu(i, inventory, this, this.data);
     }
 
-    // Capability handling for energy and fuel
-    @Nonnull
     @Override
-    public <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.ITEM_HANDLER) {
-            return fuelHandlerOptional.cast();
-        }
-        if (cap == ForgeCapabilities.ENERGY) {
-            return energyOptional.cast();
-        }
-        return super.getCapability(cap, side);
+    public void onLoad() {
+        super.onLoad();
+        lazyItemHandler = LazyOptional.of(() -> itemStackHandler);
     }
 
     @Override
     public void invalidateCaps() {
         super.invalidateCaps();
-        fuelHandlerOptional.invalidate();
-        energyOptional.invalidate();
+        lazyItemHandler.invalidate();
     }
+
+    @Override
+    protected void saveAdditional(CompoundTag pTag) {
+        pTag.put("inventory", itemStackHandler.serializeNBT());
+        pTag.putInt("coal_generator.progress", progress);
+
+        super.saveAdditional(pTag);
+    }
+
+    @Override
+    public void load(CompoundTag pTag) {
+        super.load(pTag);
+        itemStackHandler.deserializeNBT(pTag.getCompound("inventory"));
+        progress = pTag.getInt("coal_generator.progress");
+    }
+
+    public void drops() {
+        SimpleContainer inventory = new SimpleContainer(itemStackHandler.getSlots());
+        for (int i = 0; i < itemStackHandler.getSlots(); i++){
+            inventory.setItem(i, itemStackHandler.getStackInSlot(i));
+        }
+
+        Containers.dropContents(this.level, this.worldPosition, inventory);
+    }
+
+    public void tick(Level level, BlockPos pPos, BlockState pState) {
+
+    }
+
+
+    private void resetProgress() {
+        this.progress = 0;
+    }
+
+    private boolean hasProgressFinished() {
+        return this.progress >= this.maxProgress;
+    }
+
+    private void increaseCraftingProcess() {
+        this.progress++;
+    }
+
+    private boolean hasRecipeItemInInputSlot() {
+        return this.itemStackHandler.getStackInSlot(INPUT_SLOT).getItem() == Items.COAL;
+    }
+
+    @Override
+    public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
+        if(cap == ForgeCapabilities.ITEM_HANDLER) {
+            return lazyItemHandler.cast();
+        }
+        return super.getCapability(cap, side);
+    }
+
+
 
 }

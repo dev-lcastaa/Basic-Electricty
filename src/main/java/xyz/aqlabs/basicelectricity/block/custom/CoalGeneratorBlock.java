@@ -3,10 +3,14 @@ package xyz.aqlabs.basicelectricity.block.custom;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.Containers;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -17,78 +21,97 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraftforge.network.NetworkHooks;
+import org.jetbrains.annotations.Nullable;
+import xyz.aqlabs.basicelectricity.block.ModBlockEntities;
 import xyz.aqlabs.basicelectricity.block.entity.CoalGeneratorBlockEntity;
+import xyz.aqlabs.basicelectricity.block.entity.ElectricFurnaceBlockEntity;
 
-import javax.annotation.Nullable;
+public class CoalGeneratorBlock extends BaseEntityBlock {
 
-public class CoalGeneratorBlock extends HorizontalDirectionalBlock {
-
-    // Block state for whether the generator is lit (burning fuel) or not
     public static final BooleanProperty LIT = BlockStateProperties.LIT;
+
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
 
     public CoalGeneratorBlock() {
         super(Properties.copy(Blocks.BLAST_FURNACE).strength(3.5F).lightLevel(state -> state.getValue(LIT) ? 13 : 0)); // Light when active
-        this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LIT, false));
+        this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LIT, true));
     }
 
-    // Create the block entity when the block is placed
-    @Nullable
-    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new CoalGeneratorBlockEntity(pos, state);
+    public static final VoxelShape SHAPE = Block.box(0,0,0,16,16,16);
+
+    public BlockState rotate(BlockState pState, Rotation pRot) {
+        return (BlockState)pState.setValue(FACING, pRot.rotate((Direction)pState.getValue(FACING)));
     }
 
-    // Ticking behavior for the block (to update energy generation and fuel consumption)
-    @Nullable
-    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> blockEntityType) {
-        return (lvl, pos, st, entity) -> {
-            if (entity instanceof CoalGeneratorBlockEntity coalGenerator) {
-                coalGenerator.tick(); // Call the tick method in the BlockEntity
+    public BlockState mirror(BlockState pState, Mirror pMirror) {
+        return pState.rotate(pMirror.getRotation((Direction)pState.getValue(FACING)));
+    }
+
+    @Override
+    public VoxelShape getShape(BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContex) {
+        return SHAPE;
+    }
+
+    @Override
+    public @org.jetbrains.annotations.Nullable BlockState getStateForPlacement(BlockPlaceContext pContext) {
+        return this.defaultBlockState().setValue(FACING, pContext.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState>  pBuilder){
+        pBuilder.add(FACING, LIT);
+    }
+
+
+    // Block Entity
+
+    @Override
+    public RenderShape getRenderShape(BlockState pState) {
+        return RenderShape.MODEL;
+    }
+
+    @Override
+    public void onRemove(BlockState pState, Level level, BlockPos pPos, BlockState pNewState, boolean pIsMoving) {
+        if (pState.getBlock() != pNewState.getBlock()) {
+            BlockEntity blockEntity = level.getBlockEntity(pPos);
+            if(blockEntity instanceof CoalGeneratorBlockEntity) {
+                ((CoalGeneratorBlockEntity) blockEntity).drops();
             }
-        };
-    }
-
-    // Called when the block is placed, setting its facing direction
-    @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
-    }
-
-    // Rotate the block when right-clicked or by redstone logic
-    @Override
-    public BlockState rotate(BlockState state, Rotation rotation) {
-        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
-    }
-
-    // Mirror the block's state (used for world mirroring or redstone)
-    @Override
-    public BlockState mirror(BlockState state, Mirror mirror) {
-        return state.rotate(mirror.getRotation(state.getValue(FACING)));
-    }
-
-    // Create block state properties (lit and facing)
-    @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, LIT); // Add FACING and LIT to block state
-    }
-
-    // Drop the contents of the block entity's inventory when broken
-    @Override
-    public void onRemove(BlockState state, Level world, BlockPos pos, BlockState newState, boolean isMoving) {
-        if (!state.is(newState.getBlock())) {
-            BlockEntity blockEntity = world.getBlockEntity(pos);
-            if (blockEntity instanceof CoalGeneratorBlockEntity) {
-                Containers.dropContents(world, pos, (Container) blockEntity);
-                world.updateNeighbourForOutputSignal(pos, this);
-            }
-            super.onRemove(state, world, pos, newState, isMoving);
         }
+        super.onRemove(pState, level, pPos, pNewState, pIsMoving);
     }
 
-    // Change the block's lit state based on fuel consumption (called by BlockEntityCoalGenerator)
-    public static void setLit(Level world, BlockPos pos, boolean lit) {
-        BlockState state = world.getBlockState(pos);
-        world.setBlock(pos, state.setValue(LIT, lit), 3);
+    @Override
+    public InteractionResult use(BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHit) {
+        if (!pLevel.isClientSide()) {
+            BlockEntity blockEntity = pLevel.getBlockEntity(pPos);
+            if(blockEntity instanceof CoalGeneratorBlockEntity) {
+                NetworkHooks.openScreen(((ServerPlayer)pPlayer),(CoalGeneratorBlockEntity) blockEntity, pPos);
+            } else {
+                throw new IllegalStateException("Our Container is missing");
+            }
+        }
+        return InteractionResult.sidedSuccess(pLevel.isClientSide());
     }
+
+    @Override
+    public @org.jetbrains.annotations.Nullable BlockEntity newBlockEntity(BlockPos blockPos, BlockState blockState) {
+        return new CoalGeneratorBlockEntity(blockPos, blockState);
+    }
+
+    @Nullable
+    @Override
+    public <T extends BlockEntity>BlockEntityTicker<T> getTicker (Level pLevel, BlockState pState, BlockEntityType<T> pBlockEntityType) {
+        if(pLevel.isClientSide()){
+            return null;
+        }
+        return createTickerHelper(pBlockEntityType, ModBlockEntities.COAL_GENERATOR.get(),
+                (pLevel1, pPos, pState1, pBlockEntity) -> pBlockEntity.tick(pLevel1, pPos, pState1));
+    }
+
 
 }

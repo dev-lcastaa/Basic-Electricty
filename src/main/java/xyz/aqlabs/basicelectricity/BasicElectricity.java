@@ -17,6 +17,7 @@ import xyz.aqlabs.basicelectricity.block.ModBlockEntities;
 import xyz.aqlabs.basicelectricity.block.ModBlocks;
 import xyz.aqlabs.basicelectricity.item.ModCreativeModTabs;
 import xyz.aqlabs.basicelectricity.item.ModItems;
+import xyz.aqlabs.basicelectricity.screen.CoalGeneratorScreen;
 import xyz.aqlabs.basicelectricity.screen.ElectricFurnaceScreen;
 import xyz.aqlabs.basicelectricity.screen.ModMenuTypes;
 
@@ -80,6 +81,7 @@ public class BasicElectricity {
         public static void onClientSetup(FMLClientSetupEvent event) {
             event.enqueueWork(() -> {
                 MenuScreens.register(ModMenuTypes.ELECTRIC_FURNACE_MENU.get(), ElectricFurnaceScreen::new);
+                MenuScreens.register(ModMenuTypes.COAL_GENERATOR_MENU.get(), CoalGeneratorScreen::new);
             });
         }
     }

@@ -18,6 +18,10 @@ public class ModMenuTypes {
     public static final RegistryObject<MenuType<ElectricFurnaceMenu>> ELECTRIC_FURNACE_MENU =
             registryMenuType( ElectricFurnaceMenu::new, "electric_furnace_menu");
 
+    public static final RegistryObject<MenuType<CoalGeneratorMenu>> COAL_GENERATOR_MENU =
+            registryMenuType( CoalGeneratorMenu::new, "coal_generator_menu");
+
+
 
 
 
